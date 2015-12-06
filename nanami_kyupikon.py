@@ -90,7 +90,6 @@ def make_text_kyupikons():
     random.shuffle(kyupikons)
     return kyupikons
 
-
 def tweet_kyupikon(action='random_choice'):
     if action == 'random_choice':
         status = get_text_kyupikon()
@@ -101,28 +100,43 @@ def tweet_kyupikon(action='random_choice'):
     except TwythonError as e:
         print(e, file=sys.stderr)
 
+def tweet_kyupikon(action='random_choice'):
+    if action == 'random_choice':
+        status = get_text_kyupikon()
+    print('--')
+    print('Tweeting: \'{}\''.format(status))
+    try:
+        api.update_status(status=status)
+    except tweepy.TweepError as e:
+        print(e, file=sys.stderr)
+        
 def get_tweets_text_list():
     return [tw.text for tw in api.user_timeline(count=100)]
 
 def get_text_kyupikon():
+    '''「きゅぴこん」のキューから一つ取り出してテキストを返す'''
     global text_kyupikons_queue
     if not text_kyupikons_queue:
         text_kyupikons_queue = make_text_kyupikons()
     kyupikon = text_kyupikons_queue.pop()
 
-    # update yaml
-    with open('text_kyupikons_queue.yaml', 'w') as f:
-        yaml.dump(text_kyupikons_queue, f, allow_unicode=True)
-    
+    # update queue
+    save_yaml('text_kyupikons_queue.yaml', text_kyupikons_queue)
+
     return kyupikon
     
-def load_text_kyupikons_queue():
-    with open('text_kyupikons_queue.yaml') as f:
-        queue = yaml.load(f)
-    return queue
+def load_yaml(filename):
+    with open(filename) as f:
+        data = yaml.load(f)
+    return data
 
+def save_yaml(filename, data):
+    with open(filename, 'w') as f:
+        yaml.dump(data, f, allow_unicode=True)
+    
 if __name__ == '__main__':
-    text_kyupikons_queue = load_text_kyupikons_queue()
+    text_kyupikons_queue = load_yaml('text_kyupikons_queue.yaml')
+    text_kyupikons_reply_queue = load_yaml('text_kyupikons_reply_queue.yaml')
     api = get_api()
 
     parser = argparse.ArgumentParser()
