@@ -35,37 +35,33 @@ def get_api():
     return api
 
 class StreamListener(tweepy.StreamListener):
-    def __init__(self):
-        self.latest_status = None
-        self.latest_event = None
 
     def on_status(self, status):
         print('! status')
-        self.latest_status = status
-        print(self.latest_status)
+        print(status)
 
-        # when sent reply
-        if '@' + api.auth.username in status.text:
+        # when sent reply by others
+        if status.author.screen_name != api.auth.username and \
+           '@' + api.auth.username in status.text:
 
             # unfollow if 'フォロー解除' in text
             if 'フォロー解除' in status.text:
                 api.destroy_friendship(screen_name=status.author.screen_name)
-                tweet('今までありがとう♥ またね、ばいばい。', status.author.screen_name)
+                tweet('今までありがとう♥ またね、ばいばい。', status.author.screen_name, reply_id=status.id)
                 
             # refollow if 'フォロー' in text
             elif 'フォロー' in status.text:
                 api.create_friendship(screen_name=status.author.screen_name)
-                tweet('よろしくね♥', status.author.screen_name)
+                tweet('よろしくね♥', status.author.screen_name, reply_id=status.id)
 
             # otherwise, reply 'きゅぴこん♥' selected at random
             else:
                 kyupikon = get_text_kyupikon_reply()
-                tweet(kyupikon, status.author.screen_name)
+                tweet(kyupikon, status.author.screen_name, reply_id=status.id)
         
     def on_event(self, event):
         print('! event')
-        self.latest_event = event
-        print(self.latest_event)
+        print(event)
 
         screen_name = event.source.get('screen_name')
         
@@ -85,13 +81,19 @@ class StreamListener(tweepy.StreamListener):
     def on_error(self, error_code):
         print('error:', error_code)
 
-def tweet(status, screen_name=None):
+    def on_disconnect(self, notice):
+        print('disconnect:', notice)
+
+    def on_warning(self, notice):
+        print('warning:', notice)
+
+def tweet(status, screen_name=None, reply_id=None):
     '''statusで指定したテキストをツイートをする。screen_nameがあればリプライを送る'''
     if screen_name:
         status = '@{} {}'.format(screen_name, status)
     try:
         if not args.debug:
-            api.update_status(status=status)
+            api.update_status(status=status, in_reply_to_status_id=reply_id)
     except tweepy.TweepError as e:
         print(e, file=sys.stderr)
 
@@ -129,7 +131,7 @@ def get_text_kyupikon():
     kyupikon = text_kyupikons_queue.pop()
 
     # update queue
-    save_yaml('text_kyupikons_queue.yaml', text_kyupikons_queue, allow_unicode=True)
+    save_yaml('text_kyupikons_queue.yaml', text_kyupikons_queue)
 
     return kyupikon
     
