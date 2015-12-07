@@ -20,13 +20,17 @@ def get_api():
         # final step
         oauth_token ,oauth_token_secret = auth.get_access_token(pin)
         secrets['oauth_token'], secrets['oauth_token_secret'] = oauth_token ,oauth_token_secret
+
+        auth.get_username()         # set screen_name to auth.username
+        secrets['screen_name'] = auth.username
+        
         with open(secrets_filename, 'w') as f:
             yaml.dump(secrets, f)
     else:
         auth = tweepy.OAuthHandler(consumer_key=secrets['app_key'],
                                    consumer_secret=secrets['app_secret'])
         auth.set_access_token(secrets['oauth_token'], secrets['oauth_token_secret'])
-    auth.get_username()         # set screen_name to auth.username
+        auth.username = secrets.get('screen_name')
     api = tweepy.API(auth)
     return api
 
@@ -86,18 +90,25 @@ def tweet(status, screen_name=None):
     if screen_name:
         status = '@{} {}'.format(screen_name, status)
     try:
-        api.update_status(status=status)
-        print('--')
-        print('Tweeted: \'{}\''.format(status))
+        if not args.debug:
+            api.update_status(status=status)
     except tweepy.TweepError as e:
         print(e, file=sys.stderr)
+
+    print('--')
+    print('Tweeted: \'{}\''.format(status))
 
 def make_text_kyupikons():
     '''ななみがきゅぴこんするbot(@nanami_kyupikon) 由来の30種類+αの「きゅぴこん」を作成する'''
     firsts = ['きゅぴこん', 'きゅぴこ〜ん', 'きゅっぴこ〜ん',
               'キュピコン', 'キュピコ〜ン', 'キュッピコ〜ン']
-    lasts = [''] + [mark * n for mark in ['♡', '♥', '！', '？', '♪', '♫', '★', '☆', '✨'] for n in range(1, 3)]
-    kyupikons = [''.join((x, y)) for x in firsts for y in lasts]
+    marks = ['♡', '♥', '！', '？', '♪', '☆', '✨', '🌟', '💕', '💞']
+    lasts = [mark * n for mark in marks for n in range(1, 3)]
+    kyupikons = {x+y for x in firsts for y in lasts}
+    recents = {tw.text for tw in api.user_timeline(count=50)}
+    inits = kyupikons - recents
+    lasts = kyupikons & recents
+    kyupikons = list(inits) + list(lasts)
     random.shuffle(kyupikons)
     return kyupikons
 
@@ -118,7 +129,7 @@ def get_text_kyupikon():
     kyupikon = text_kyupikons_queue.pop()
 
     # update queue
-    save_yaml('text_kyupikons_queue.yaml', text_kyupikons_queue)
+    save_yaml('text_kyupikons_queue.yaml', text_kyupikons_queue, allow_unicode=True)
 
     return kyupikon
     
@@ -140,8 +151,9 @@ def load_yaml(filename):
     return data
 
 def save_yaml(filename, data):
-    with open(filename, 'w') as f:
-        yaml.dump(data, f, allow_unicode=True)
+    if not args.debug:
+        with open(filename, 'w') as f:
+            yaml.dump(data, f, allow_unicode=True)
     
 if __name__ == '__main__':
     text_kyupikons_queue = load_yaml('text_kyupikons_queue.yaml')
@@ -149,7 +161,8 @@ if __name__ == '__main__':
     api = get_api()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['tweet_kyupikon', 'stream'])
+    parser.add_argument('action', choices=['tweet_kyupikon', 'stream'], help='specify the action')
+    parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
     args = parser.parse_args()
 
     if args.action == 'tweet_kyupikon':
