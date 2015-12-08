@@ -23,7 +23,7 @@ def get_api():
         oauth_token ,oauth_token_secret = auth.get_access_token(pin)
         secrets['oauth_token'], secrets['oauth_token_secret'] = oauth_token ,oauth_token_secret
 
-        auth.get_username()         # set screen_name to auth.username
+        auth.get_username()
         secrets['screen_name'] = auth.username
         
         with open(secrets_filename, 'w') as f:
@@ -43,7 +43,8 @@ class StreamListener(tweepy.StreamListener):
 
         # when sent reply by others
         if status.author.screen_name != api.auth.username and \
-           '@' + api.auth.username in status.text:
+           '@' + api.auth.username in status.text and \
+           'RT' not in status.text:
 
             # unfollow if 'フォロー解除' in text
             if 'フォロー解除' in status.text:
