@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import random
+import datetime
 import yaml
 import argparse
 import tweepy
@@ -74,7 +75,8 @@ class StreamListener(tweepy.StreamListener):
 
             # otherwise, give information how to refollow
             else:
-                tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
+                #tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
+                tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォロー解除してほしい時には、「フォロー解除」って言ってね♥', screen_name)
 
     def on_error(self, error_code):
         print('error:', error_code, file=sys.stderr)
@@ -111,7 +113,25 @@ def print_event(event):
                                       event.target.get('name'), event.target.get('screen_name')))
     if 'target_object' in event.__dict__:
         print_status(event.target_object)
-    
+
+def print_rate_limit():
+    '''APIのrate_limitを見やすく整形して表示する'''
+    def print_element(key, element):
+        if element.get('limit') == element.get('remaining'):
+            mod = ' '
+        else:
+            mod = '*'
+        print('{}\t{} {}\t{}\t{}'.format(element.get('limit'), element.get('remaining'), mod, str(datetime.datetime.fromtimestamp(element.get('reset'))), key))
+
+    def print_rate_limit_iter(rate_limit, k=None):
+        if 'limit' in rate_limit:
+            print_element(k, rate_limit)
+        elif isinstance(rate_limit, dict):
+            for k,v in rate_limit.items():
+                print_rate_limit_iter(v, k)
+
+    print_rate_limit_iter(api.rate_limit_status())
+                
 def make_text_kyupikons():
     '''ななみがきゅぴこんするbot(@nanami_kyupikon) 由来の30種類+αの「きゅぴこん」を作成する'''
     firsts = ['きゅぴこん', 'きゅぴこ〜ん', 'きゅっぴこ〜ん',
