@@ -37,8 +37,7 @@ def get_api():
 class StreamListener(tweepy.StreamListener):
 
     def on_status(self, status):
-        print('! status')
-        print(status)
+        print_status(status)
 
         # when sent reply by others
         if status.author.screen_name != api.auth.username and \
@@ -60,8 +59,7 @@ class StreamListener(tweepy.StreamListener):
                 tweet(kyupikon, status.author.screen_name, reply_id=status.id)
         
     def on_event(self, event):
-        print('! event')
-        print(event)
+        print_event(event)
 
         screen_name = event.source.get('screen_name')
         
@@ -88,16 +86,32 @@ class StreamListener(tweepy.StreamListener):
         print('warning:', notice, file=sys.stderr)
 
 def tweet(status, screen_name=None, reply_id=None):
-    '''statusで指定したテキストをツイートをする。screen_nameがあればリプライを送る'''
+    '''statusで指定したテキストをツイートし、screen_nameがあればリプライを送る'''
     if screen_name:
         status = '@{} {}'.format(screen_name, status)
     try:
-        print('Tweeting: \'{}\''.format(status))
-        if not args.debug:
+        if args.debug:
+            print('Tweeting on debug: \'{}\''.format(status))
+        else:
             api.update_status(status=status, in_reply_to_status_id=reply_id)
     except tweepy.TweepError as e:
         print('error on tweet():', e, file=sys.stderr)
 
+def print_status(status):
+    '''Statusオブジェクトをリーダブルに表示する'''
+    print('-'*20)
+    print('{} {}(@{}) {}'.format(status.created_at, status.user.name, status.user.screen_name, status.id))
+    print(status.text)
+
+def print_event(event):
+    '''eventとしてのStatusオブジェクトをリーダブルに表示する'''
+    print('-'*20)
+    print('event:', event.event)
+    print('{}(@{}) -> {}(@{})'.format(event.source.get('name'), event.source.get('screen_name'),
+                                      event.target.get('name'), event.target.get('screen_name')))
+    if 'target_object' in event.__dict__:
+        print_status(event.target_object)
+    
 def make_text_kyupikons():
     '''ななみがきゅぴこんするbot(@nanami_kyupikon) 由来の30種類+αの「きゅぴこん」を作成する'''
     firsts = ['きゅぴこん', 'きゅぴこ〜ん', 'きゅっぴこ〜ん',
