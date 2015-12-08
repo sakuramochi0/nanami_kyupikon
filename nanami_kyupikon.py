@@ -2,6 +2,7 @@
 import sys
 import random
 import datetime
+from dateutil.parser import parse
 import yaml
 import argparse
 import tweepy
@@ -75,8 +76,7 @@ class StreamListener(tweepy.StreamListener):
 
             # otherwise, give information how to refollow
             else:
-                #tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
-                tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォロー解除してほしい時には、「フォロー解除」って言ってね♥', screen_name)
+                tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
 
     def on_error(self, error_code):
         print('error:', error_code, file=sys.stderr)
@@ -102,8 +102,13 @@ def tweet(status, screen_name=None, reply_id=None):
 def print_status(status):
     '''Statusオブジェクトをリーダブルに表示する'''
     print('-'*20)
-    print('{} {}(@{}) {}'.format(status.created_at, status.user.name, status.user.screen_name, status.id))
-    print(status.text)
+    if isinstance(status, tweepy.Status):
+        print('{} {}(@{}) {}'.format(status.created_at, status.user.name, status.user.screen_name, status.id))
+        print(status.text)
+    elif isinstance(status, dict):
+        print('{} {}(@{}) {}'.format(parse(status['created_at']), status['user']['name'], status['user']['screen_name'], status['id']))
+    else:
+        print(status)
 
 def print_event(event):
     '''eventとしてのStatusオブジェクトをリーダブルに表示する'''
