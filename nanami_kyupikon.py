@@ -79,46 +79,45 @@ class StreamListener(tweepy.StreamListener):
                 tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
 
     def on_error(self, error_code):
-        print('error:', error_code)
+        print('error:', error_code, file=sys.stderr)
 
     def on_disconnect(self, notice):
-        print('disconnect:', notice)
+        print('disconnect:', notice, file=sys.stderr)
 
     def on_warning(self, notice):
-        print('warning:', notice)
+        print('warning:', notice, file=sys.stderr)
 
 def tweet(status, screen_name=None, reply_id=None):
     '''statusで指定したテキストをツイートをする。screen_nameがあればリプライを送る'''
     if screen_name:
         status = '@{} {}'.format(screen_name, status)
     try:
+        print('Tweeting: \'{}\''.format(status))
         if not args.debug:
             api.update_status(status=status, in_reply_to_status_id=reply_id)
     except tweepy.TweepError as e:
-        print(e, file=sys.stderr)
-
-    print('--')
-    print('Tweeted: \'{}\''.format(status))
+        print('error on tweet():', e, file=sys.stderr)
 
 def make_text_kyupikons():
     '''ななみがきゅぴこんするbot(@nanami_kyupikon) 由来の30種類+αの「きゅぴこん」を作成する'''
     firsts = ['きゅぴこん', 'きゅぴこ〜ん', 'きゅっぴこ〜ん',
               'キュピコン', 'キュピコ〜ン', 'キュッピコ〜ン']
     marks = ['♡', '♥', '！', '？', '♪', '☆', '✨', '🌟', '💕', '💞']
-    lasts = [mark * n for mark in marks for n in range(1, 3)]
-    kyupikons = {x+y for x in firsts for y in lasts}
+    postfixes = [mark * n for mark in marks for n in range(1, 3)]
+    kyupikons = {first + postfix for first in firsts for postfix in postfixes}
     recents = {tw.text for tw in api.user_timeline(count=50)}
-    inits = kyupikons - recents
-    lasts = kyupikons & recents
-    kyupikons = list(inits) + list(lasts)
-    random.shuffle(kyupikons)
+    inits = list(kyupikons & recents)
+    lasts = list(kyupikons - recents)
+    random.shuffle(inits)
+    random.shuffle(lasts)
+    kyupikons = inits + lasts
     return kyupikons
 
 def tweet_kyupikon():
     '''ランダムに選ばれた「きゅぴこん♥」のキューから一つ取り出してツイートする'''
     status = get_text_kyupikon()
     tweet(status)
-        
+    
 def get_tweets_text_list():
     '''デバッグ用: 最新100個のツイートテキストのリストを取得する'''
     return [tw.text for tw in api.user_timeline(count=100)]
