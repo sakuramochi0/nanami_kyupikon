@@ -138,26 +138,27 @@ def favorite(status):
             print('Favorite on debug:')
             print_status(status)
         
-def print_status(status):
+def print_status(status, file=sys.stdout):
     '''Statusオブジェクトをリーダブルに表示する'''
     if isinstance(status, tweepy.Status):
-        print('{} {}(@{}) {}'.format(status.created_at, status.user.name, status.user.screen_name, status.id))
-        print(status.text)
+        print('{} {}(@{}) {}'.format(status.created_at, status.user.name, status.user.screen_name, status.id), file=file)
+        print(status.text, file=file)
     elif isinstance(status, dict):
-        print('{} {}(@{}) {}'.format(parse(status['created_at']), status['user']['name'], status['user']['screen_name'], status['id']))
+        print('{} {}(@{}) {}'.format(parse(status['created_at']), status['user']['name'], status['user']['screen_name'], status['id']), file=file)
     else:
-        print(status)
+        print(status, file=file)
     print('-' * 20)
 
-def print_event(event):
+def print_event(event, file=sys.stdout):
     '''eventとしてのStatusオブジェクトをリーダブルに表示する'''
-    print('event:', event.event)
+    print('event:', event.event, file=file)
     print('{}(@{}) -> {}(@{})'.format(event.source.get('name'), event.source.get('screen_name'),
-                                      event.target.get('name'), event.target.get('screen_name')))
+                                      event.target.get('name'), event.target.get('screen_name'))
+          , file=file)
     if 'target_object' in event.__dict__:
         print_status(event.target_object)
     else:
-        print('-' * 20)
+        print('-' * 20, file=file)
 
 def print_rate_limit():
     '''APIのrate_limitを見やすく整形して表示する'''
@@ -201,6 +202,8 @@ def favorite_kyupikon():
     '''「きゅぴこん|キュピコン」が含まれるツイートを検索してfavoriteする'''
     statuses = api.search(q='きゅぴこん OR キュピコン -RT -nanami_kyupiko', count=200)
     for status in statuses:
+        print('on favorit_kyupikon():')
+        print_status(status)
         favorite(status)
 
 def process_stream():
