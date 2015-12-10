@@ -6,6 +6,7 @@ from dateutil.parser import parse
 import yaml
 import argparse
 import tweepy
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 def get_api():
     '''TweepyのREST APIオブジェクトを作る'''
@@ -39,29 +40,48 @@ def get_api():
 class StreamListener(tweepy.StreamListener):
 
     def on_status(self, status):
+        print('on_status')
         print_status(status)
-
-        # when sent reply by others
-        if status.author.screen_name != api.auth.username and \
-           '@' + api.auth.username in status.text and \
-           'RT' not in status.text:
-
-            # unfollow if 'フォロー解除' in text
-            if 'フォロー解除' in status.text:
-                api.destroy_friendship(screen_name=status.author.screen_name)
-                tweet('今までありがとう♥ またね、ばいばい。', status.author.screen_name, reply_id=status.id)
-                
-            # refollow if 'フォロー' in text
-            elif 'フォロー' in status.text:
-                api.create_friendship(screen_name=status.author.screen_name)
-                tweet('よろしくね♥', status.author.screen_name, reply_id=status.id)
-
-            # otherwise, reply 'きゅぴこん♥' selected at random
-            else:
-                kyupikon = get_text_kyupikon_reply()
-                tweet(kyupikon, status.author.screen_name, reply_id=status.id)
         
+        # not tweet by myself
+        if status.author.screen_name != api.auth.username:
+            
+            # when sent reply by others
+            if '@' + api.auth.username in status.text and \
+               'RT' not in status.text:
+                
+                # unfollow if 'フォロー解除' in text
+                if 'フォロー解除' in status.text:
+                    api.destroy_friendship(screen_name=status.author.screen_name)
+                    tweet('今までありがとう♥ またね、ばいばい。', status.author.screen_name, reply_id=status.id)
+                    
+                # refollow if 'フォロー' in text
+                elif 'フォロー' in status.text:
+                    api.create_friendship(screen_name=status.author.screen_name)
+                    tweet('よろしくね♥', status.author.screen_name, reply_id=status.id)
+
+                # add the user to deny list
+                elif 'いいねしないで' in status.text:
+                    deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
+                    deny_favorite_user_ids.add(status.user.id)
+                    save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
+                    tweet('わかったきゅぴこん。ごめんね…(._.)', status.user.screen_name, reply_id=status.id)
+                    
+                # remove the user from deny list
+                elif 'いいねして' in status.text:
+                    deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
+                    if status.user.id in deny_favorite_user_ids:
+                        deny_favorite_user_ids.remove(status.user.id)
+                    save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
+                    tweet('わかったきゅぴこん！', status.user.screen_name, reply_id=status.id)
+                    
+                # otherwise, reply 'きゅぴこん♥' selected at random
+                else:
+                    kyupikon = get_text_kyupikon_reply()
+                    tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+
     def on_event(self, event):
+        print('on_event')
         print_event(event)
 
         screen_name = event.source.get('screen_name')
@@ -77,7 +97,11 @@ class StreamListener(tweepy.StreamListener):
 
             # otherwise, give information how to refollow
             else:
-                tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
+                # when already following, e.g. followed at first from me
+                if event.source.get('following'):
+                    tweet('フォローしてくれてありがとうキュピコン♪ フォロー解除してほしい時は、ななみに「フォロー解除」って言ってね♥', screen_name)
+                else:
+                    tweet('フォローしてくれてありがとうキュピコン♪ ななみにフォローしてほしい時には、「フォロー」って言ってね♥ 「フォロー解除」って言うと、フォローを解除するよ。', screen_name)
 
     def on_error(self, error_code):
         print('error:', error_code, file=sys.stderr)
@@ -100,9 +124,22 @@ def tweet(status, screen_name=None, reply_id=None):
     except tweepy.TweepError as e:
         print('error on tweet():', e, file=sys.stderr)
 
+def favorite(status):
+    '''Statusオブジェクトとして指定されたツイートをfavoriteする'''
+    favorited_ids = load_yaml('favorited_ids.yaml')
+    deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
+    if status.id not in favorited_ids and \
+       status.user.id not in deny_favorite_user_ids:
+        if not args.debug:
+            api.create_favorite(id=status.id)
+            favorited_ids.add(status.id)
+            save_yaml('favorited_ids.yaml', favorited_ids)
+        else:
+            print('Favorite on debug:')
+            print_status(status)
+        
 def print_status(status):
     '''Statusオブジェクトをリーダブルに表示する'''
-    print('-'*20)
     if isinstance(status, tweepy.Status):
         print('{} {}(@{}) {}'.format(status.created_at, status.user.name, status.user.screen_name, status.id))
         print(status.text)
@@ -110,15 +147,17 @@ def print_status(status):
         print('{} {}(@{}) {}'.format(parse(status['created_at']), status['user']['name'], status['user']['screen_name'], status['id']))
     else:
         print(status)
+    print('-' * 20)
 
 def print_event(event):
     '''eventとしてのStatusオブジェクトをリーダブルに表示する'''
-    print('-'*20)
     print('event:', event.event)
     print('{}(@{}) -> {}(@{})'.format(event.source.get('name'), event.source.get('screen_name'),
                                       event.target.get('name'), event.target.get('screen_name')))
     if 'target_object' in event.__dict__:
         print_status(event.target_object)
+    else:
+        print('-' * 20)
 
 def print_rate_limit():
     '''APIのrate_limitを見やすく整形して表示する'''
@@ -157,6 +196,18 @@ def tweet_kyupikon():
     '''ランダムに選ばれた「きゅぴこん♥」のキューから一つ取り出してツイートする'''
     status = get_text_kyupikon()
     tweet(status)
+
+def favorite_kyupikon():
+    '''「きゅぴこん|キュピコン」が含まれるツイートを検索してfavoriteする'''
+    statuses = api.search(q='きゅぴこん OR キュピコン -RT -nanami_kyupiko', count=200)
+    for status in statuses:
+        favorite(status)
+
+def process_stream():
+    '''userstreamを読み込んで処理する'''
+    stream_listener = StreamListener()
+    stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
+    stream.userstream(replies=all, track=['@nanami_kyupiko -RT'])
     
 def get_tweets_text_list():
     '''デバッグ用: 最新100個のツイートテキストのリストを取得する'''
@@ -199,16 +250,17 @@ def save_yaml(filename, data):
 if __name__ == '__main__':
     text_kyupikons_queue = load_yaml('text_kyupikons_queue.yaml')
     text_kyupikons_reply_queue = load_yaml('text_kyupikons_reply_queue.yaml')
+
     api = get_api()
 
+    # parse args
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['tweet_kyupikon', 'stream'], help='specify the action')
     parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
     args = parser.parse_args()
 
-    if args.action == 'tweet_kyupikon':
-        tweet_kyupikon()
-    elif args.action == 'stream':
-        stream_listener = StreamListener()
-        stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
-        stream.userstream(replies=all, track=['@nanami_kyupiko'])
+    # set & run scheduler
+    sched = BlockingScheduler()
+    sched.add_job(process_stream)
+    sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
+    sched.add_job(favorite_kyupikon, 'cron', minute='*')
+    sched.start()
