@@ -66,7 +66,7 @@ class StreamListener(tweepy.StreamListener):
                     deny_favorite_user_ids.add(status.user.id)
                     save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
                     tweet('わかったきゅぴこん。ごめんね…(._.)', status.user.screen_name, reply_id=status.id)
-                    
+
                 # remove the user from deny list
                 elif 'いいねして' in status.text:
                     deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
@@ -75,8 +75,31 @@ class StreamListener(tweepy.StreamListener):
                     save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
                     tweet('わかったきゅぴこん！', status.user.screen_name, reply_id=status.id)
                     
+                # add the user to allow all kyupikon list
+                elif 'ぜんぶきゅぴこんして' in status.text:
+                    allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
+                    allow_all_kyupikon_user_ids.add(status.user.id)
+                    save_yaml('allow_all_kyupikon_user_ids.yaml', allow_all_kyupikon_user_ids)
+                    tweet('きゅっぴこ〜ん♥♥♥', status.user.screen_name, reply_id=status.id)
+                    
+                # add the user to allow all kyupikon list
+                elif 'ぜんぶきゅぴこんしないで' in status.text:
+                    allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
+                    if status.user.id in allow_all_kyupikon_user_ids:
+                        allow_all_kyupikon_user_ids.remove(status.user.id)
+                    save_yaml('allow_all_kyupikon_user_ids.yaml', allow_all_kyupikon_user_ids)
+                    tweet('わかったきゅぴこん♪', status.user.screen_name, reply_id=status.id)
+                    
                 # otherwise, reply 'きゅぴこん♥' selected at random
                 else:
+                    kyupikon = get_text_kyupikon_reply()
+                    tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+
+            # normal tweet by followers
+            else:
+                # reply 'きゅぴこん♥', if the user's id is in allow_all_kyupikon_user_ids
+                allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
+                if status.user.id in allow_all_kyupikon_user_ids:
                     kyupikon = get_text_kyupikon_reply()
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
 
@@ -131,6 +154,8 @@ def favorite(status):
     if status.id not in favorited_ids and \
        status.user.id not in deny_favorite_user_ids:
         if not args.debug:
+            print('Favoriting:')
+            print_status(status)
             api.create_favorite(id=status.id)
             favorited_ids.add(status.id)
             save_yaml('favorited_ids.yaml', favorited_ids)
@@ -202,8 +227,6 @@ def favorite_kyupikon():
     '''「きゅぴこん|キュピコン」が含まれるツイートを検索してfavoriteする'''
     statuses = api.search(q='きゅぴこん OR キュピコン -RT -nanami_kyupiko', count=200)
     for status in statuses:
-        print('on favorit_kyupikon():')
-        print_status(status)
         favorite(status)
 
 def process_stream():
