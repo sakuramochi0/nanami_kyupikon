@@ -232,13 +232,8 @@ def tweet_kyupikon():
     tweet(status)
 
 def favorite_kyupikon():
-    '''「きゅぴこん|キュピコン」または「白井ななみ」が含まれるツイートを検索してfavoriteする'''
-    # きゅぴこん|キュピコン
-    statuses = api.search(q='きゅぴこん OR キュピコン -RT -nanami_kyupiko', count=200)
-    for status in statuses:
-        favorite(status)
-    # 白井ななみ
-    statuses = api.search(q='"白井ななみ" -RT -nanami_kyupiko', count=200)
+    '''「きゅぴこん」または「キュピコン」または「白井ななみ」が含まれるツイートを検索してfavoriteする'''
+    statuses = api.search(q='きゅぴこん OR キュピコン OR "白井ななみ" -RT -nanami_kyupiko', count=200)
     for status in statuses:
         favorite(status)
 
