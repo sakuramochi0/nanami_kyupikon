@@ -156,9 +156,17 @@ def favorite(status):
         if not args.debug:
             print('Favoriting:')
             print_status(status)
-            api.create_favorite(id=status.id)
-            favorited_ids.add(status.id)
-            save_yaml('favorited_ids.yaml', favorited_ids)
+            try:
+                api.create_favorite(id=status.id)
+                favorited_ids.add(status.id)
+                save_yaml('favorited_ids.yaml', favorited_ids)
+            except tweepy.TweepError as e:
+                # when the tweet has already favorited
+                if e.api_code == 139:
+                    favorited_ids.add(status.id)
+                    save_yaml('favorited_ids.yaml', favorited_ids)
+
+                
         else:
             print('Favorite on debug:')
             print_status(status)
@@ -224,8 +232,13 @@ def tweet_kyupikon():
     tweet(status)
 
 def favorite_kyupikon():
-    '''「きゅぴこん|キュピコン」が含まれるツイートを検索してfavoriteする'''
+    '''「きゅぴこん|キュピコン」または「白井ななみ」が含まれるツイートを検索してfavoriteする'''
+    # きゅぴこん|キュピコン
     statuses = api.search(q='きゅぴこん OR キュピコン -RT -nanami_kyupiko', count=200)
+    for status in statuses:
+        favorite(status)
+    # 白井ななみ
+    statuses = api.search(q='"白井ななみ" -RT -nanami_kyupiko', count=200)
     for status in statuses:
         favorite(status)
 
@@ -290,3 +303,4 @@ if __name__ == '__main__':
     sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
     sched.add_job(favorite_kyupikon, 'cron', minute='*')
     sched.start()
+
