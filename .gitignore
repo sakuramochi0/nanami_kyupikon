@@ -59,5 +59,4 @@ target/
 .oauth_secrets.yaml
 \#*
 *~
-text_kyupikons_queue.yaml
-text_kyupikons_reply_queue.yaml
+*.yaml
