@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
+import os
 import sys
+import re
 import random
 import datetime
 from dateutil.parser import parse
 import yaml
 import argparse
+import requests
 import tweepy
 from apscheduler.schedulers.blocking import BlockingScheduler
+
+from signature import draw_signature
 
 def get_api():
     '''TweepyのREST APIオブジェクトを作る'''
@@ -74,7 +79,7 @@ class StreamListener(tweepy.StreamListener):
                         deny_favorite_user_ids.remove(status.user.id)
                     save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
                     tweet('わかったきゅぴこん！', status.user.screen_name, reply_id=status.id)
-                    
+
                 # add the user to allow all kyupikon list
                 elif 'ぜんぶきゅぴこんして' in status.text:
                     allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
@@ -90,6 +95,28 @@ class StreamListener(tweepy.StreamListener):
                     save_yaml('allow_all_kyupikon_user_ids.yaml', allow_all_kyupikon_user_ids)
                     tweet('わかったきゅぴこん♪', status.user.screen_name, reply_id=status.id)
                     
+                # draw nanami's signature down the given image
+                elif 'サインして' in status.text:
+                    medias = status.entities.get('media')
+                    if not medias:
+                        tweet('サインするものがないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                    else:
+                        for media in medias:
+                            if media.get('type') != 'photo':
+                                tweet('画像にしてほしいきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                            else:
+                                img_url = media.get('media_url_https')
+                                r = requests.get(img_url + ':orig')
+                                filename = 'tmp/' + status.id_str + os.path.splitext(img_url)[1]
+                                with open(filename, 'bw') as f:
+                                    f.write(r.content)
+                                signed_image_path = draw_signature(
+                                    filename,
+                                    size_limit=api.configuration().get('photo_size_limit'))
+                                kyupikon = get_text_kyupikon_reply()
+                                tweet(kyupikon, status.user.screen_name, reply_id=status.id,
+                                      media_filename=signed_image_path)
+                    
                 # otherwise, reply 'きゅぴこん♥' selected at random
                 else:
                     kyupikon = get_text_kyupikon_reply()
@@ -102,6 +129,12 @@ class StreamListener(tweepy.StreamListener):
                 if status.user.id in allow_all_kyupikon_user_ids:
                     kyupikon = get_text_kyupikon_reply()
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+
+                # if 'きゅぴこん♥' in status, reply 'きゅぴこん♥'
+                elif re.match(r'きゅぴこん|キュピコン|白井ななみ', status.text):
+                    kyupikon = get_text_kyupikon_reply()
+                    tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+                    favorite(status)
 
     def on_event(self, event):
         print('on_event')
@@ -135,7 +168,7 @@ class StreamListener(tweepy.StreamListener):
     def on_warning(self, notice):
         print('warning:', notice, file=sys.stderr)
 
-def tweet(status, screen_name=None, reply_id=None):
+def tweet(status, screen_name=None, reply_id=None, media_filename=None):
     '''statusで指定したテキストをツイートし、screen_nameがあればリプライを送る'''
     if screen_name:
         status = '@{} {}'.format(screen_name, status)
@@ -143,7 +176,12 @@ def tweet(status, screen_name=None, reply_id=None):
         if args.debug:
             print('Tweeting on debug: \'{}\''.format(status))
         else:
-            api.update_status(status=status, in_reply_to_status_id=reply_id)
+            if not media_filename:
+                res = api.update_status(status=status, in_reply_to_status_id=reply_id)
+            else:
+                res = api.update_with_media(media_filename, status=status, in_reply_to_status_id=reply_id)
+            print('Tweeted at', datetime.datetime.now())
+            print(res)
     except tweepy.TweepError as e:
         print('error on tweet():', e, file=sys.stderr)
 
@@ -165,8 +203,6 @@ def favorite(status):
                 if e.api_code == 139:
                     favorited_ids.add(status.id)
                     save_yaml('favorited_ids.yaml', favorited_ids)
-
-                
         else:
             print('Favorite on debug:')
             print_status(status)
