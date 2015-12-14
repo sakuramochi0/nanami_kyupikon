@@ -107,7 +107,7 @@ class StreamListener(tweepy.StreamListener):
                             else:
                                 img_url = media.get('media_url_https')
                                 r = requests.get(img_url + ':orig')
-                                filename = 'tmp/' + status.id_str + os.path.splitext(img_url)[1]
+                                filename = 'var/' + status.id_str + os.path.splitext(img_url)[1]
                                 with open(filename, 'bw') as f:
                                     f.write(r.content)
                                 signed_image_path = draw_signature(
@@ -251,7 +251,7 @@ def make_text_kyupikons():
     '''ななみがきゅぴこんするbot(@nanami_kyupikon) 由来の30種類+αの「きゅぴこん」を作成する'''
     firsts = ['きゅぴこん', 'きゅぴこ〜ん', 'きゅっぴこ〜ん',
               'キュピコン', 'キュピコ〜ン', 'キュッピコ〜ン']
-    marks = ['♡', '♥', '！', '？', '♪', '☆', '✨', '🌟', '💕', '💞']
+    marks = ['♡', '♥', '！', '？', '♪', '☆', '✨', '🌟', '💕', '💞', '🐦']
     postfixes = [mark * n for mark in marks for n in range(1, 3)]
     kyupikons = {first + postfix for first in firsts for postfix in postfixes}
     recents = {tw.text for tw in api.user_timeline(count=50)}
