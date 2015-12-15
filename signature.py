@@ -1,8 +1,9 @@
 import os
+import re
 import base64
 from PIL import Image
 
-def draw_signature(infile, size_limit):
+def draw_signature(infile, position, size_limit):
     '''画像にななみちゃんのサインを描いて、その画像を保存したファイル名を返す'''
 
     # load images
@@ -14,14 +15,47 @@ def draw_signature(infile, size_limit):
     sign_resize_ratio = min(im.size) * ratio_against_image / sign.size[0]
     
     # resize signature
-    resized_sign = sign.resize((int(sign.size[0] * sign_resize_ratio), int(sign.size[1] * sign_resize_ratio)), Image.BICUBIC)
+    sign = sign.resize((int(sign.size[0] * sign_resize_ratio), int(sign.size[1] * sign_resize_ratio)), Image.BICUBIC)
     
     # determine paste position
-    box_position = (im.size[0] // 30, im.size[1] - resized_sign.size[1])
-    box = box_position + (resized_sign.size[0] + box_position[0], resized_sign.size[1] + box_position[1])
+    center_x, center_y = im.size[0] // 2, im.size[1] // 2
+    left = im.size[0] // 30
+    right = im.size[0] - im.size[0] // 30
+    top = im.size[1] // 30
+    bottom = im.size[1] - im.size[1] // 30
+    
+    if position == 'top-left':
+        box_left = left
+        box_top = top
+    elif position == 'top':
+        box_left = center_x - sign.size[0] // 2
+        box_top = top
+    elif position == 'top-right':
+        box_left = right - sign.size[0]
+        box_top = top
+    elif position == 'left':
+        box_left = left
+        box_top = center_y - sign.size[1] // 2
+    elif position == 'center':
+        box_left = center_x - sign.size[0] // 2
+        box_top = center_y - sign.size[1] // 2
+    elif position == 'right':
+        box_left = right - sign.size[0]
+        box_top = center_y - sign.size[1] // 2
+    elif position == 'bottom-left':
+        box_left = left
+        box_top = bottom - sign.size[1]
+    elif position == 'bottom':
+        box_left = center_x - sign.size[0] // 2
+        box_top = bottom - sign.size[1]
+    elif position == 'bottom-right':
+        box_left = right - sign.size[0]
+        box_top = bottom - sign.size[1]
+    
+    box = (box_left, box_top, box_left + sign.size[0], box_top + sign.size[1])
 
     # paste sign
-    im.paste(resized_sign, box, resized_sign)
+    im.paste(sign, box, sign)
 
     # check size limit
     while True:
@@ -42,3 +76,31 @@ def draw_signature(infile, size_limit):
         print('Can\'t write the image:', e)
         
     return outfile
+
+def parse_signature_position(text):
+    '''textにもとづいてsignatureを配置するpositionを表す文字列を返す'''
+
+    # find positional strings
+    match = re.search(r'(?:(上|下)|(右|左)|(中央|真ん中)|.)+', text)
+    if match:
+        vertical, horizon, center = match.groups()
+
+    # convert name into english
+    if horizon:
+        horizon = horizon.replace('左', 'left').replace('右', 'right')
+    if vertical:
+        vertical = vertical.replace('上', 'top').replace('下', 'bottom')
+
+    # determine position name
+    if vertical and horizon:
+        position = vertical + '-' + horizon
+    elif vertical:
+        position = vertical
+    elif horizon:
+        position = horizon
+    elif center:
+        position = 'center'
+    else: # default
+        position = 'bottom-left'
+    
+    return position

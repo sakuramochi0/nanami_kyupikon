@@ -11,7 +11,7 @@ import requests
 import tweepy
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from signature import draw_signature
+from signature import draw_signature, parse_signature_position
 
 def get_api():
     '''TweepyのREST APIオブジェクトを作る'''
@@ -105,14 +105,22 @@ class StreamListener(tweepy.StreamListener):
                             if media.get('type') != 'photo':
                                 tweet('画像にしてほしいきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
                             else:
+                                # download images
                                 img_url = media.get('media_url_https')
                                 r = requests.get(img_url + ':orig')
                                 filename = 'var/' + status.id_str + os.path.splitext(img_url)[1]
                                 with open(filename, 'bw') as f:
                                     f.write(r.content)
+
+                                # draw nanami's signature
+                                position = parse_signature_position(status.text)
                                 signed_image_path = draw_signature(
                                     filename,
-                                    size_limit=api.configuration().get('photo_size_limit'))
+                                    position=position,
+                                    size_limit=api.configuration().get('photo_size_limit'),
+                                )
+
+                                # tweet
                                 kyupikon = get_text_kyupikon_reply()
                                 tweet(kyupikon, status.user.screen_name, reply_id=status.id,
                                       media_filename=signed_image_path)
