@@ -158,7 +158,7 @@ class StreamListener(tweepy.StreamListener):
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
 
                 # if 'きゅぴこん♥' in status, reply 'きゅぴこん♥'
-                elif re.search(r'きゅぴこん|キュピコン|ななみちゃん|白井ななみ', status.text):
+                elif re.search(r'きゅぴこん|キュピコン|ななみちゃん|白井ななみ|kyupikon', status.text):
                     kyupikon = get_text_kyupikon_reply()
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
                     favorite(status)
@@ -296,7 +296,7 @@ def tweet_kyupikon():
 
 def favorite_kyupikon():
     '''「きゅぴこん」または「キュピコン」または「白井ななみ」が含まれるツイートを検索してfavoriteする'''
-    statuses = api.search(q='きゅぴこん OR キュピコン OR "白井ななみ" -RT -nanami_kyupiko', count=200)
+    statuses = api.search(q='きゅぴこん OR キュピコン OR "白井ななみ" OR kyupikon -RT -kyupikon_nanami -nanami_kyupiko', count=200)
     for status in statuses:
         favorite(status)
 
