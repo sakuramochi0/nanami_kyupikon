@@ -102,13 +102,17 @@ class StreamListener(tweepy.StreamListener):
                     if not target_id:
                         tweet('このツイートは消せないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
                     else:
-                        target = api.get_status(id=target_id)
-                        # check if the request is by the valid user
-                        if target.in_reply_to_user_id == status.user.id:  # requested by the user to have been replied
-                            target.destroy()
-                            tweet('消したきゅぴこん！', status.user.screen_name, reply_id=status.id)
-                        else:
-                            tweet('このツイートは消せないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                        try:
+                            target = api.get_status(id=target_id)
+                            # check if the request is by the valid user
+                            if target.in_reply_to_user_id == status.user.id:  # requested by the user to have been replied
+                                target.destroy()
+                                tweet('消したきゅぴこん！', status.user.screen_name, reply_id=status.id)
+                            else:
+                                tweet('このツイートは消せないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                        except tweepy.TweepError:
+                            tweet('うまく消せなかったきゅぴこん… >_< 少し経ってから、もう一度試してみてねきゅぴこん♪',
+                                  status.user.screen_name, reply_id=status.id)
 
                 # draw nanami's signature down the given image
                 elif 'サインして' in status.text:
