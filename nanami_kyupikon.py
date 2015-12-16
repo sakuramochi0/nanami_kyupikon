@@ -117,7 +117,7 @@ class StreamListener(tweepy.StreamListener):
                                 signed_image_path = draw_signature(
                                     filename,
                                     position=position,
-                                    size_limit=api.configuration().get('photo_size_limit'),
+                                    size_limit=PHOTO_SIZE_LIMIT,
                                 )
 
                                 # tweet
@@ -328,6 +328,9 @@ def save_yaml(filename, data):
 # prepare api object
 api = get_api()
 
+# init constant
+PHOTO_SIZE_LIMIT = api.configuration().get('photo_size_limit')
+
 # parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
@@ -341,4 +344,3 @@ if __name__ == '__main__':
     sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
     sched.add_job(favorite_kyupikon, 'cron', minute='*')
     sched.start()
-
