@@ -188,8 +188,8 @@ def tweet(status, screen_name=None, reply_id=None, media_filename=None):
                 res = api.update_status(status=status, in_reply_to_status_id=reply_id)
             else:
                 res = api.update_with_media(media_filename, status=status, in_reply_to_status_id=reply_id)
-            print('Tweeted at', datetime.datetime.now())
-            print(res)
+                print('Tweeted with photos at', datetime.datetime.now())
+                print(res)
     except tweepy.TweepError as e:
         print('error on tweet():', e, file=sys.stderr)
 
@@ -293,7 +293,7 @@ def get_tweets_text_list():
 
 def get_text_kyupikon():
     '''「きゅぴこん♥」のキューから一つ取り出してテキストを返す'''
-    global text_kyupikons_queue
+    text_kyupikons_queue = load_yaml('text_kyupikons_queue.yaml')
     if not text_kyupikons_queue:
         text_kyupikons_queue = make_text_kyupikons()
     kyupikon = text_kyupikons_queue.pop()
@@ -305,7 +305,7 @@ def get_text_kyupikon():
     
 def get_text_kyupikon_reply():
     '''リプライ用の「きゅぴこん♥」のキューから一つ取り出してテキストを返す'''
-    global text_kyupikons_reply_queue
+    text_kyupikons_reply_queue = load_yaml('text_kyupikons_reply_queue.yaml')
     if not text_kyupikons_reply_queue:
         text_kyupikons_reply_queue = make_text_kyupikons()
     kyupikon = text_kyupikons_reply_queue.pop()
@@ -324,17 +324,16 @@ def save_yaml(filename, data):
     if not args.debug:
         with open(filename, 'w') as f:
             yaml.dump(data, f, allow_unicode=True)
-    
+
+# prepare api object
+api = get_api()
+
+# parse args
+parser = argparse.ArgumentParser()
+parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
+args = parser.parse_args()
+
 if __name__ == '__main__':
-    text_kyupikons_queue = load_yaml('text_kyupikons_queue.yaml')
-    text_kyupikons_reply_queue = load_yaml('text_kyupikons_reply_queue.yaml')
-
-    api = get_api()
-
-    # parse args
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
-    args = parser.parse_args()
 
     # set & run scheduler
     sched = BlockingScheduler()
