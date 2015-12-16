@@ -10,6 +10,7 @@ import argparse
 import requests
 import tweepy
 from apscheduler.schedulers.blocking import BlockingScheduler
+from pymongo.mongo_client import MongoClient
 
 from signature import draw_signature, parse_signature_position
 
@@ -67,37 +68,26 @@ class StreamListener(tweepy.StreamListener):
 
                 # add the user to deny list
                 elif 'いいねしないで' in status.text:
-                    deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
-                    deny_favorite_user_ids.add(status.user.id)
-                    save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
+                    update_db('users', status.user.id, 'deny_favorite', True)
                     tweet('わかったきゅぴこん。ごめんね…(._.)', status.user.screen_name, reply_id=status.id)
 
                 # remove the user from deny list
                 elif 'いいねして' in status.text:
-                    deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
-                    if status.user.id in deny_favorite_user_ids:
-                        deny_favorite_user_ids.remove(status.user.id)
-                    save_yaml('deny_favorite_user_ids.yaml', deny_favorite_user_ids)
+                    update_db('users', status.user.id, 'deny_favorite', False)
                     tweet('わかったきゅぴこん！', status.user.screen_name, reply_id=status.id)
 
                 # add the user to allow all kyupikon list
                 elif 'ぜんぶきゅぴこんして' in status.text:
-                    allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
-                    allow_all_kyupikon_user_ids.add(status.user.id)
-                    save_yaml('allow_all_kyupikon_user_ids.yaml', allow_all_kyupikon_user_ids)
+                    update_db('users', status.user.id, 'allow_all_kyupikon', True)
                     tweet('きゅっぴこ〜ん♥♥♥', status.user.screen_name, reply_id=status.id)
                     
                 # add the user to allow all kyupikon list
                 elif 'ぜんぶきゅぴこんしないで' in status.text:
-                    allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
-                    if status.user.id in allow_all_kyupikon_user_ids:
-                        allow_all_kyupikon_user_ids.remove(status.user.id)
-                    save_yaml('allow_all_kyupikon_user_ids.yaml', allow_all_kyupikon_user_ids)
+                    update_db('users', status.user.id, 'allow_all_kyupikon', False)
                     tweet('わかったきゅぴこん♪', status.user.screen_name, reply_id=status.id)
                     
                 # delete a specified user's tweet
                 elif '削除して' in status.text or '消して' in status.text:
-
                     target_id = status.in_reply_to_status_id
                     if not target_id:
                         tweet('このツイートは消せないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
@@ -152,13 +142,14 @@ class StreamListener(tweepy.StreamListener):
             # normal tweet by followers
             else:
                 # reply 'きゅぴこん♥', if the user's id is in allow_all_kyupikon_user_ids
-                allow_all_kyupikon_user_ids = load_yaml('allow_all_kyupikon_user_ids.yaml')
-                if status.user.id in allow_all_kyupikon_user_ids:
+                allowed = get_value_db('users', status.user.id, 'allow_all_kyupikon')
+                if allowed:
                     kyupikon = get_text_kyupikon_reply()
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
 
                 # if 'きゅぴこん♥' in status, reply 'きゅぴこん♥'
-                elif re.search(r'きゅぴこん|キュピコン|ななみちゃん|白井ななみ|kyupikon', status.text):
+                elif re.search(r'きゅぴこん|キュピコン|ななみちゃん|白井ななみ|kyupikon', status.text) \
+                     and 'RT' not in status.text:
                     kyupikon = get_text_kyupikon_reply()
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
                     favorite(status)
@@ -214,22 +205,20 @@ def tweet(status, screen_name=None, reply_id=None, media_filename=None):
 
 def favorite(status):
     '''Statusオブジェクトとして指定されたツイートをfavoriteする'''
-    favorited_ids = load_yaml('favorited_ids.yaml')
-    deny_favorite_user_ids = load_yaml('deny_favorite_user_ids.yaml')
-    if status.id not in favorited_ids and \
-       status.user.id not in deny_favorite_user_ids:
+    if not get_value_db('tweets', status.id, 'favorited') and \
+       not get_value_db('users', status.user.id, 'deny_favorite'):
         if not args.debug:
             print('Favoriting:')
             print_status(status)
             try:
                 api.create_favorite(id=status.id)
-                favorited_ids.add(status.id)
-                save_yaml('favorited_ids.yaml', favorited_ids)
+                update_db('tweets', status.id, 'favorited', True)
             except tweepy.TweepError as e:
                 # when the tweet has already favorited
                 if e.api_code == 139:
-                    favorited_ids.add(status.id)
-                    save_yaml('favorited_ids.yaml', favorited_ids)
+                    update_db('tweets', status.id, 'favorited', True)
+                else:
+                    print('error on favorite():', e, file=sys.stderr)
         else:
             print('Favorite on debug:')
             print_status(status)
@@ -334,6 +323,16 @@ def get_text_kyupikon_reply():
 
     return kyupikon
     
+def update_db(collection, id, key, value):
+    return db[collection].update({'_id': id}, {'$set': {key: value}}, upsert=True)
+
+def get_value_db(collection, id, key):
+    doc = db[collection].find_one({'_id': id})
+    if doc:
+        return doc.get(key)
+    else:
+        return None
+
 def load_yaml(filename):
     with open(filename) as f:
         data = yaml.load(f)
@@ -349,6 +348,9 @@ api = get_api()
 
 # init constant
 PHOTO_SIZE_LIMIT = api.configuration().get('photo_size_limit')
+
+# prepare db
+db = MongoClient().nanami_kyupikon
 
 # parse args
 parser = argparse.ArgumentParser()
