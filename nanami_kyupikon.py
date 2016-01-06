@@ -11,6 +11,7 @@ import requests
 import tweepy
 from apscheduler.schedulers.blocking import BlockingScheduler
 from pymongo.mongo_client import MongoClient
+from pprint import pprint
 
 from signature import draw_signature, parse_signature_position
 
@@ -77,12 +78,12 @@ class StreamListener(tweepy.StreamListener):
                     tweet('わかったきゅぴこん！', status.user.screen_name, reply_id=status.id)
 
                 # add the user to allow all kyupikon list
-                elif 'ぜんぶきゅぴこんして' in status.text:
+                elif 'ぜんぶきゅぴこんして' in status.text or 'ぜんぶキュピコンして' in status.text:
                     update_db('users', status.user.id, 'allow_all_kyupikon', True)
                     tweet('きゅっぴこ〜ん♥♥♥', status.user.screen_name, reply_id=status.id)
                     
                 # add the user to allow all kyupikon list
-                elif 'ぜんぶきゅぴこんしないで' in status.text:
+                elif 'ぜんぶきゅぴこんしないで' in status.text or 'ぜんぶキュピコンしないで' in status.text:
                     update_db('users', status.user.id, 'allow_all_kyupikon', False)
                     tweet('わかったきゅぴこん♪', status.user.screen_name, reply_id=status.id)
                     
@@ -358,7 +359,6 @@ parser.add_argument('--debug', action='store_true', help='enable debug mode to a
 args = parser.parse_args()
 
 if __name__ == '__main__':
-
     # set & run scheduler
     sched = BlockingScheduler()
     sched.add_job(process_stream)
