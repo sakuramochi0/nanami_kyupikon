@@ -15,6 +15,9 @@ from pprint import pprint
 
 from signature import draw_signature, parse_signature_position
 
+ALL_KYUPIKON_REGEX = re.compile(r'(全部|ぜんぶ)(きゅぴこん|キュピコン)して')
+ALL_KYUPIKON_NOT_REGEX = re.compile(r'(全部|ぜんぶ)(きゅぴこん|キュピコン)しないで')
+
 def get_api():
     '''TweepyのREST APIオブジェクトを作る'''
     secrets_filename = '.oauth_secrets.yaml'
@@ -67,23 +70,13 @@ class StreamListener(tweepy.StreamListener):
                     api.create_friendship(screen_name=status.author.screen_name)
                     tweet('よろしくね♥', status.author.screen_name, reply_id=status.id)
 
-                # add the user to deny list
-                elif 'いいねしないで' in status.text:
-                    update_db('users', status.user.id, 'deny_favorite', True)
-                    tweet('わかったきゅぴこん。ごめんね…(._.)', status.user.screen_name, reply_id=status.id)
-
-                # remove the user from deny list
-                elif 'いいねして' in status.text:
-                    update_db('users', status.user.id, 'deny_favorite', False)
-                    tweet('わかったきゅぴこん！', status.user.screen_name, reply_id=status.id)
-
                 # add the user to allow all kyupikon list
-                elif 'ぜんぶきゅぴこんして' in status.text or 'ぜんぶキュピコンして' in status.text:
+                elif ALL_KYUPIKON_REGEX.search(status.text):
                     update_db('users', status.user.id, 'allow_all_kyupikon', True)
                     tweet('きゅっぴこ〜ん♥♥♥', status.user.screen_name, reply_id=status.id)
                     
                 # add the user to allow all kyupikon list
-                elif 'ぜんぶきゅぴこんしないで' in status.text or 'ぜんぶキュピコンしないで' in status.text:
+                elif ALL_KYUPIKON_NOT_REGEX.search(status.text):
                     update_db('users', status.user.id, 'allow_all_kyupikon', False)
                     tweet('わかったきゅぴこん♪', status.user.screen_name, reply_id=status.id)
                     
@@ -153,7 +146,6 @@ class StreamListener(tweepy.StreamListener):
                      and 'RT' not in status.text:
                     kyupikon = get_text_kyupikon_reply()
                     tweet(kyupikon, status.author.screen_name, reply_id=status.id)
-                    favorite(status)
 
     def on_event(self, event):
         print('on_event')
@@ -203,26 +195,6 @@ def tweet(status, screen_name=None, reply_id=None, media_filename=None):
                 print(res)
     except tweepy.TweepError as e:
         print('error on tweet():', e, file=sys.stderr)
-
-def favorite(status):
-    '''Statusオブジェクトとして指定されたツイートをfavoriteする'''
-    if not get_value_db('tweets', status.id, 'favorited') and \
-       not get_value_db('users', status.user.id, 'deny_favorite'):
-        if not args.debug:
-            print('Favoriting:')
-            print_status(status)
-            try:
-                api.create_favorite(id=status.id)
-                update_db('tweets', status.id, 'favorited', True)
-            except tweepy.TweepError as e:
-                # when the tweet has already favorited
-                if e.api_code == 139:
-                    update_db('tweets', status.id, 'favorited', True)
-                else:
-                    print('error on favorite():', e, file=sys.stderr)
-        else:
-            print('Favorite on debug:')
-            print_status(status)
         
 def print_status(status, file=sys.stdout):
     '''Statusオブジェクトをリーダブルに表示する'''
@@ -283,12 +255,6 @@ def tweet_kyupikon():
     '''ランダムに選ばれた「きゅぴこん♥」のキューから一つ取り出してツイートする'''
     status = get_text_kyupikon()
     tweet(status)
-
-def favorite_kyupikon():
-    '''「きゅぴこん」または「キュピコン」または「白井ななみ」が含まれるツイートを検索してfavoriteする'''
-    statuses = api.search(q='きゅぴこん OR キュピコン OR "白井ななみ" OR kyupikon -RT -kyupikon_nanami -nanami_kyupiko', count=200)
-    for status in statuses:
-        favorite(status)
 
 def process_stream():
     '''userstreamを読み込んで処理する'''
@@ -363,5 +329,4 @@ if __name__ == '__main__':
     sched = BlockingScheduler()
     sched.add_job(process_stream)
     sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
-    sched.add_job(favorite_kyupikon, 'cron', minute='*')
     sched.start()
