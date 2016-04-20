@@ -130,8 +130,10 @@ class StreamListener(tweepy.StreamListener):
                     
                 # otherwise, reply 'きゅぴこん♥' selected at random
                 else:
-                    kyupikon = get_text_kyupikon_reply()
-                    tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+                    allowed = not get_value_db('users', status.user.id, 'deny_reply')
+                    if allowed:
+                        kyupikon = get_text_kyupikon_reply()
+                        tweet(kyupikon, status.author.screen_name, reply_id=status.id)
 
             # normal tweet by followers
             else:

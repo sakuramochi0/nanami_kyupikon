@@ -81,7 +81,7 @@ def parse_signature_position(text):
     '''textにもとづいてsignatureを配置するpositionを表す文字列を返す'''
 
     # find positional strings
-    match = re.search(r'(?:(上|下)|(右|左)|(中央|真ん中)|.)+', text)
+    match = re.search(r'(?:(上|下)|(右|左)|(中央|真ん中)|.)+', text.replace('\n', ''))
     if match:
         vertical, horizon, center = match.groups()
 
