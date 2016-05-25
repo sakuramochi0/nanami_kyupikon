@@ -70,10 +70,14 @@ class StreamListener(tweepy.StreamListener):
                     api.create_friendship(screen_name=status.author.screen_name)
                     tweet('よろしくね♥', status.author.screen_name, reply_id=status.id)
 
+                # reply to 'ありがとう'
+                elif 'ありがとう' in status.text:
+                    tweet('どういたしまして♥ きゅぴこん♪', status.author.screen_name, reply_id=status.id)
+
                 # add the user to allow all kyupikon list
                 elif ALL_KYUPIKON_REGEX.search(status.text):
                     update_db('users', status.user.id, 'allow_all_kyupikon', True)
-                    tweet('きゅっぴこ〜ん♥♥♥', status.user.screen_name, reply_id=status.id)
+                    tweet('きゅっぴこ〜ん♥♥♥♥♥', status.user.screen_name, reply_id=status.id)
                     
                 # add the user to allow all kyupikon list
                 elif ALL_KYUPIKON_NOT_REGEX.search(status.text):
@@ -106,7 +110,8 @@ class StreamListener(tweepy.StreamListener):
                     else:
                         for media in medias:
                             if media.get('type') != 'photo':
-                                tweet('画像にしてほしいきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                                tweet('画像にしてほしいきゅぴこん… >_<', status.user.screen_name,
+                                      reply_id=status.id)
                             else:
                                 # download images
                                 img_url = media.get('media_url_https')
