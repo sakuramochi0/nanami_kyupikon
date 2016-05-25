@@ -17,6 +17,8 @@ from signature import draw_signature, parse_signature_position
 
 ALL_KYUPIKON_REGEX = re.compile(r'(全部|ぜんぶ)(きゅぴこん|キュピコン)して')
 ALL_KYUPIKON_NOT_REGEX = re.compile(r'(全部|ぜんぶ)(きゅぴこん|キュピコン)しないで')
+THANKS_REGEX = re.compile(r'ありがとう|有り?難う')
+KAWAII_REGEX = re.compile(r'かわいい|可愛い|きれい|綺麗')
 
 def get_api():
     '''TweepyのREST APIオブジェクトを作る'''
@@ -71,8 +73,12 @@ class StreamListener(tweepy.StreamListener):
                     tweet('よろしくね♥', status.author.screen_name, reply_id=status.id)
 
                 # reply to 'ありがとう'
-                elif 'ありがとう' in status.text:
+                elif THANKS_REGEX.search(status.text):
                     tweet('どういたしまして♥ きゅぴこん♪', status.author.screen_name, reply_id=status.id)
+
+                # reply to 'かわいい'
+                elif KAWAII_REGEX.search(status.text):
+                    tweet('ありがとうきゅぴこん♥', status.author.screen_name, reply_id=status.id)
 
                 # add the user to allow all kyupikon list
                 elif ALL_KYUPIKON_REGEX.search(status.text):
@@ -136,9 +142,15 @@ class StreamListener(tweepy.StreamListener):
                 # otherwise, reply 'きゅぴこん♥' selected at random
                 else:
                     allowed = not get_value_db('users', status.user.id, 'deny_reply')
-                    if allowed:
+                    reply_count = get_value_db('counts', status.user.id, 'counts')
+                    if not reply_count:
+                        update_db('counts', status.user.id, 'counts', 0)
+                        update_db('counts', status.user.id, 'screen_name', status.user.screen_name)
+                        reply_count = get_value_db('counts', status.user.id, 'counts')
+                    if allowed and reply_count < 30:
                         kyupikon = get_text_kyupikon_reply()
                         tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+                        inc_db('counts', status.user.id, 'counts')
 
             # normal tweet by followers
             else:
@@ -146,13 +158,13 @@ class StreamListener(tweepy.StreamListener):
                 allowed = get_value_db('users', status.user.id, 'allow_all_kyupikon')
                 if allowed:
                     kyupikon = get_text_kyupikon_reply()
-                    tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+                    tweet(kyupikon, status.user.screen_name, reply_id=status.id)
 
                 # if 'きゅぴこん♥' in status, reply 'きゅぴこん♥'
                 elif re.search(r'きゅぴこん|キュピコン|ななみちゃん|白井ななみ|kyupikon', status.text) \
                      and 'RT' not in status.text:
                     kyupikon = get_text_kyupikon_reply()
-                    tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+                    tweet(kyupikon, status.user.screen_name, reply_id=status.id)
 
     def on_event(self, event):
         print('on_event')
@@ -300,6 +312,9 @@ def get_text_kyupikon_reply():
 def update_db(collection, id, key, value):
     return db[collection].update({'_id': id}, {'$set': {key: value}}, upsert=True)
 
+def inc_db(collection, id, key, value=1):
+    return db[collection].update({'_id': id}, {'$inc': {key: value}}, upsert=True)
+
 def get_value_db(collection, id, key):
     doc = db[collection].find_one({'_id': id})
     if doc:
@@ -329,11 +344,15 @@ db = MongoClient().nanami_kyupikon
 # parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
+parser.add_argument('--reset_counts', action='store_true', help='reset reply counts database')
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    # set & run scheduler
-    sched = BlockingScheduler()
-    sched.add_job(process_stream)
-    sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
-    sched.start()
+    if args.reset_counts:
+        db.counts.remove()
+    else:
+        # set & run scheduler
+        sched = BlockingScheduler()
+        sched.add_job(process_stream)
+        sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
+        sched.start()
