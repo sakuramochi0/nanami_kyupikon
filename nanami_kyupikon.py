@@ -83,40 +83,40 @@ class StreamListener(tweepy.StreamListener):
                 # add the user to allow all kyupikon list
                 elif ALL_KYUPIKON_REGEX.search(status.text):
                     update_db('users', status.user.id, 'allow_all_kyupikon', True)
-                    tweet('きゅっぴこ〜ん♥♥♥♥♥', status.user.screen_name, reply_id=status.id)
+                    tweet('きゅっぴこ〜ん♥♥♥♥♥', status.author.screen_name, reply_id=status.id)
                     
                 # add the user to allow all kyupikon list
                 elif ALL_KYUPIKON_NOT_REGEX.search(status.text):
                     update_db('users', status.user.id, 'allow_all_kyupikon', False)
-                    tweet('わかったきゅぴこん♪', status.user.screen_name, reply_id=status.id)
+                    tweet('わかったきゅぴこん♪', status.author.screen_name, reply_id=status.id)
                     
                 # delete a specified user's tweet
                 elif '削除して' in status.text or '消して' in status.text:
                     target_id = status.in_reply_to_status_id
                     if not target_id:
-                        tweet('このツイートは消せないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                        tweet('このツイートは消せないきゅぴこん… >_<', status.author.screen_name, reply_id=status.id)
                     else:
                         try:
                             target = api.get_status(id=target_id)
                             # check if the request is by the valid user
                             if target.in_reply_to_user_id == status.user.id:  # requested by the user to have been replied
                                 target.destroy()
-                                tweet('消したきゅぴこん！', status.user.screen_name, reply_id=status.id)
+                                tweet('消したきゅぴこん！', status.author.screen_name, reply_id=status.id)
                             else:
-                                tweet('このツイートは消せないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                                tweet('このツイートは消せないきゅぴこん… >_<', status.author.screen_name, reply_id=status.id)
                         except tweepy.TweepError:
                             tweet('うまく消せなかったきゅぴこん… >_< 少し経ってから、もう一度試してみてねきゅぴこん♪',
-                                  status.user.screen_name, reply_id=status.id)
+                                  status.author.screen_name, reply_id=status.id)
 
                 # draw nanami's signature down the given image
                 elif 'サインして' in status.text:
                     medias = status.entities.get('media')
                     if not medias:
-                        tweet('サインするものがないきゅぴこん… >_<', status.user.screen_name, reply_id=status.id)
+                        tweet('サインするものがないきゅぴこん… >_<', status.author.screen_name, reply_id=status.id)
                     else:
                         for media in medias:
                             if media.get('type') != 'photo':
-                                tweet('画像にしてほしいきゅぴこん… >_<', status.user.screen_name,
+                                tweet('画像にしてほしいきゅぴこん… >_<', status.author.screen_name,
                                       reply_id=status.id)
                             else:
                                 # download images
@@ -136,7 +136,7 @@ class StreamListener(tweepy.StreamListener):
 
                                 # tweet
                                 kyupikon = get_text_kyupikon_reply()
-                                tweet(kyupikon, status.user.screen_name, reply_id=status.id,
+                                tweet(kyupikon, status.author.screen_name, reply_id=status.id,
                                       media_filename=signed_image_path)
                     
                 # otherwise, reply 'きゅぴこん♥' selected at random
@@ -147,12 +147,12 @@ class StreamListener(tweepy.StreamListener):
                         update_db('counts', status.user.id, 'counts', 0)
                         update_db('counts', status.user.id, 'screen_name', status.user.screen_name)
                         reply_count = get_value_db('counts', status.user.id, 'counts')
-                    if allowed and reply_count < 30:
+                    if allowed and reply_count < 15:
                         kyupikon = get_text_kyupikon_reply()
-                        tweet(kyupikon, status.author.screen_name, reply_id=status.id)
+                        tweet(kyupikon, status.user.screen_name, reply_id=status.id)
                         inc_db('counts', status.user.id, 'counts')
 
-            # normal tweet by followers
+            # non-reply normal tweet by followers
             else:
                 # reply 'きゅぴこん♥', if the user's id is in allow_all_kyupikon_user_ids
                 allowed = get_value_db('users', status.user.id, 'allow_all_kyupikon')
