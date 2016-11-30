@@ -9,6 +9,7 @@ import yaml
 import argparse
 import requests
 import tweepy
+import redis
 from apscheduler.schedulers.blocking import BlockingScheduler
 from pymongo.mongo_client import MongoClient
 from pprint import pprint
@@ -135,7 +136,7 @@ class StreamListener(tweepy.StreamListener):
                                 )
 
                                 # tweet
-                                kyupikon = get_text_kyupikon_reply()
+                                kyupikon = get_text_kyupikon('reply')
                                 tweet(kyupikon, status.author.screen_name, reply_id=status.id,
                                       media_filename=signed_image_path)
                     
@@ -148,7 +149,7 @@ class StreamListener(tweepy.StreamListener):
                         update_db('counts', status.user.id, 'screen_name', status.user.screen_name)
                         reply_count = get_value_db('counts', status.user.id, 'counts')
                     if allowed and reply_count < 15:
-                        kyupikon = get_text_kyupikon_reply()
+                        kyupikon = get_text_kyupikon('reply')
                         tweet(kyupikon, status.user.screen_name, reply_id=status.id)
                         inc_db('counts', status.user.id, 'counts')
 
@@ -157,13 +158,13 @@ class StreamListener(tweepy.StreamListener):
                 # reply 'きゅぴこん♥', if the user's id is in allow_all_kyupikon_user_ids
                 allowed = get_value_db('users', status.user.id, 'allow_all_kyupikon')
                 if allowed:
-                    kyupikon = get_text_kyupikon_reply()
+                    kyupikon = get_text_kyupikon('reply')
                     tweet(kyupikon, status.user.screen_name, reply_id=status.id)
 
                 # if 'きゅぴこん♥' in status, reply 'きゅぴこん♥'
                 elif re.search(r'きゅぴこん|キュピコン|ななみちゃん|白井ななみ|kyupikon', status.text) \
                      and 'RT' not in status.text:
-                    kyupikon = get_text_kyupikon_reply()
+                    kyupikon = get_text_kyupikon('reply')
                     tweet(kyupikon, status.user.screen_name, reply_id=status.id)
 
     def on_event(self, event):
@@ -259,14 +260,19 @@ def make_text_kyupikons():
     '''ななみがきゅぴこんするbot(@nanami_kyupikon) 由来の30種類+αの「きゅぴこん」を作成する'''
     firsts = ['きゅぴこん', 'きゅぴこ〜ん', 'きゅっぴこ〜ん',
               'キュピコン', 'キュピコ〜ン', 'キュッピコ〜ン']
+    # 1〜3個のマークを生成する
     marks = ['♡', '♥', '！', '？', '♪', '☆', '✨', '🌟', '💕', '💞', '🐦', '🌸']
-    postfixes = [mark * n for mark in marks for n in range(1, 3)]
+    postfixes = [mark * n
+                 for mark in marks
+                 for n in range(1, 3)]
+    # 上2つを組み合わせて、それぞれを1〜3回繰り返したものを生成する
     kyupikons = {
         (first + postfix) * times
         for first in firsts
         for postfix in postfixes
         for times in [1, 2, 3]
     }
+    # APIで制限されている重複ツイートを避けるために、最近のツイートと同じものをキューの最後に置く
     recents = {tw.text for tw in api.user_timeline(count=50)}
     inits = list(kyupikons & recents)
     lasts = list(kyupikons - recents)
@@ -286,32 +292,20 @@ def process_stream():
     stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
     stream.userstream(replies=all, track=['@nanami_kyupiko -RT'])
     
-def get_tweets_text_list():
-    '''デバッグ用: 最新100個のツイートテキストのリストを取得する'''
-    return [tw.text for tw in api.user_timeline(count=100)]
-
-def get_text_kyupikon():
+def get_text_kyupikon(type='normal'):
     '''「きゅぴこん♥」のキューから一つ取り出してテキストを返す'''
-    text_kyupikons_queue = load_yaml('text_kyupikons_queue.yaml')
-    if not text_kyupikons_queue:
-        text_kyupikons_queue = make_text_kyupikons()
-    kyupikon = text_kyupikons_queue.pop()
-
-    # update queue
-    save_yaml('text_kyupikons_queue.yaml', text_kyupikons_queue)
-
-    return kyupikon
+    # set queue name
+    if type == 'normal':
+        queue_name = kyupikons_queue_name
+    elif type == 'reply':
+        queue_name = kyupikons_reply_queue_name
+    else:
+        raise ValueError('Argument of get_text_kyupikon() is wrong:', type)
     
-def get_text_kyupikon_reply():
-    '''リプライ用の「きゅぴこん♥」のキューから一つ取り出してテキストを返す'''
-    text_kyupikons_reply_queue = load_yaml('text_kyupikons_reply_queue.yaml')
-    if not text_kyupikons_reply_queue:
-        text_kyupikons_reply_queue = make_text_kyupikons()
-    kyupikon = text_kyupikons_reply_queue.pop()
+    if not kyupikon_db.llen(queue_name):
+        kyupikon_db.rpush(queue_name, *make_text_kyupikons())
 
-    # update queue
-    save_yaml('text_kyupikons_reply_queue.yaml', text_kyupikons_reply_queue)
-
+    kyupikon = kyupikon_db.lpop(queue_name)
     return kyupikon
     
 def update_db(collection, id, key, value):
@@ -327,30 +321,23 @@ def get_value_db(collection, id, key):
     else:
         return None
 
-def load_yaml(filename):
-    with open(filename) as f:
-        data = yaml.load(f)
-    return data
-
-def save_yaml(filename, data):
-    if not args.debug:
-        with open(filename, 'w') as f:
-            yaml.dump(data, f, allow_unicode=True)
-
-# prepare api object
-api = get_api()
-
-# init constant
-PHOTO_SIZE_LIMIT = api.configuration().get('photo_size_limit')
-
 # prepare db
 db = MongoClient().nanami_kyupikon
+kyupikon_db = redis.Redis()
+kyupikons_queue_name = 'twitter_nanami_kyupiko_kyupikons_queue'
+kyupikons_reply_queue_name = 'twitter_nanami_kyupiko_kyupikons_reply_queue'
 
 # parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('--debug', action='store_true', help='enable debug mode to avoid actual tweeting')
 parser.add_argument('--reset_counts', action='store_true', help='reset reply counts database')
 args = parser.parse_args()
+
+# prepare api object
+api = get_api()
+
+# init constant
+PHOTO_SIZE_LIMIT = api.configuration().get('photo_size_limit')
 
 if __name__ == '__main__':
     if args.reset_counts:
