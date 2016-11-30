@@ -305,7 +305,7 @@ def get_text_kyupikon(type='normal'):
     if not kyupikon_db.llen(queue_name):
         kyupikon_db.rpush(queue_name, *make_text_kyupikons())
 
-    kyupikon = kyupikon_db.lpop(queue_name)
+    kyupikon = kyupikon_db.lpop(queue_name).decode()
     return kyupikon
     
 def update_db(collection, id, key, value):
