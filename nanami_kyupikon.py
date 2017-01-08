@@ -4,6 +4,7 @@ import sys
 import re
 import random
 import datetime
+import tempfile
 from dateutil.parser import parse
 import yaml
 import argparse
@@ -11,7 +12,7 @@ import requests
 import tweepy
 import redis
 from apscheduler.schedulers.blocking import BlockingScheduler
-from pymongo.mongo_client import MongoClient
+from get_mongo_client import get_mongo_client
 from pprint import pprint
 
 from signature import draw_signature, parse_signature_position
@@ -123,7 +124,7 @@ class StreamListener(tweepy.StreamListener):
                                 # download images
                                 img_url = media.get('media_url_https')
                                 r = requests.get(img_url + ':orig')
-                                filename = 'var/' + status.id_str + os.path.splitext(img_url)[1]
+                                filename = tempfile.mktemp()
                                 with open(filename, 'bw') as f:
                                     f.write(r.content)
 
@@ -322,7 +323,7 @@ def get_value_db(collection, id, key):
         return None
 
 # prepare db
-db = MongoClient().nanami_kyupikon
+db = get_mongo_client().nanami_kyupikon
 kyupikon_db = redis.Redis()
 kyupikons_queue_name = 'twitter_nanami_kyupiko_kyupikons_queue'
 kyupikons_reply_queue_name = 'twitter_nanami_kyupiko_kyupikons_reply_queue'
