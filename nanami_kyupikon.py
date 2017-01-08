@@ -14,6 +14,7 @@ import redis
 from apscheduler.schedulers.blocking import BlockingScheduler
 from get_mongo_client import get_mongo_client
 from pprint import pprint
+from get_tweepy import tweepy
 
 from signature import draw_signature, parse_signature_position
 
@@ -21,35 +22,6 @@ ALL_KYUPIKON_REGEX = re.compile(r'(全部|ぜんぶ)(きゅぴこん|キュピ�
 ALL_KYUPIKON_NOT_REGEX = re.compile(r'(全部|ぜんぶ)(きゅぴこん|キュピコン)しないで')
 THANKS_REGEX = re.compile(r'ありがとう|有り?難う')
 KAWAII_REGEX = re.compile(r'かわいい|可愛い|きれい|綺麗|すごい')
-
-def get_api():
-    '''TweepyのREST APIオブジェクトを作る'''
-    secrets_filename = '.oauth_secrets.yaml'
-    with open(secrets_filename) as f:
-        secrets = yaml.load(f)
-    if 'oauth_token' not in secrets:
-        # authentication first step
-        auth = tweepy.OAuthHandler(consumer_key=secrets['app_key'],
-                                   consumer_secret=secrets['app_secret'])
-        print(auth.get_authorization_url())
-        pin = input('Enter PIN code: ')
-
-        # final step
-        oauth_token ,oauth_token_secret = auth.get_access_token(pin)
-        secrets['oauth_token'], secrets['oauth_token_secret'] = oauth_token ,oauth_token_secret
-
-        auth.get_username()
-        secrets['screen_name'] = auth.username
-        
-        with open(secrets_filename, 'w') as f:
-            yaml.dump(secrets, f)
-    else:
-        auth = tweepy.OAuthHandler(consumer_key=secrets['app_key'],
-                                   consumer_secret=secrets['app_secret'])
-        auth.set_access_token(secrets['oauth_token'], secrets['oauth_token_secret'])
-        auth.username = secrets.get('screen_name')
-    api = tweepy.API(auth)
-    return api
 
 class StreamListener(tweepy.StreamListener):
 
