@@ -14,7 +14,7 @@ import redis
 from apscheduler.schedulers.blocking import BlockingScheduler
 from get_mongo_client import get_mongo_client
 from pprint import pprint
-from get_tweepy import tweepy
+from get_tweepy import *
 
 from signature import draw_signature, parse_signature_position
 
@@ -307,7 +307,7 @@ parser.add_argument('--reset_counts', action='store_true', help='reset reply cou
 args = parser.parse_args()
 
 # prepare api object
-api = get_api()
+api = get_api('nanami_kyupiko')
 
 # init constant
 PHOTO_SIZE_LIMIT = api.configuration().get('photo_size_limit')
