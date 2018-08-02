@@ -245,6 +245,10 @@ def make_text_kyupikons():
         for postfix in postfixes
         for times in [1, 2, 3]
     }
+
+    # 「きゅぴこん以外もしゃべれるよ♪」を追加
+    kyupikons.add('きゅぴこん以外もしゃべれるよ♪')
+
     # APIで制限されている重複ツイートを避けるために、最近のツイートと同じものをキューの最後に置く
     recents = {tw.text for tw in api.user_timeline(count=50)}
     inits = list(kyupikons & recents)
