@@ -13,6 +13,8 @@ tweepy = "*"
 redis = "*"
 apscheduler = "*"
 pillow = "*"
+python-dateutil = "*"
+pyyaml = "*"
 
 [requires]
 python_version = "3.7"
