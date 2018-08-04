@@ -286,10 +286,10 @@ def get_text_kyupikon(type='normal'):
     return kyupikon
     
 def update_db(collection, id, key, value):
-    return db[collection].update({'_id': id}, {'$set': {key: value}}, upsert=True)
+    return db[collection].update_one({'_id': id}, {'$set': {key: value}}, upsert=True)
 
 def inc_db(collection, id, key, value=1):
-    return db[collection].update({'_id': id}, {'$inc': {key: value}}, upsert=True)
+    return db[collection].update_one({'_id': id}, {'$inc': {key: value}}, upsert=True)
 
 def get_value_db(collection, id, key):
     doc = db[collection].find_one({'_id': id})
