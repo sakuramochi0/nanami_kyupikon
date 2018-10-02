@@ -320,8 +320,4 @@ if __name__ == '__main__':
     if args.reset_counts:
         db.counts.remove()
     else:
-        # set & run scheduler
-        sched = BlockingScheduler()
-        sched.add_job(process_stream)
-        sched.add_job(tweet_kyupikon, 'cron', minute='*/15')
-        sched.start()
+        tweet_kyupikon()
